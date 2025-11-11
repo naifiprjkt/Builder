@@ -5,7 +5,6 @@
 # Device: Samsung Galaxy A22 5G (A226B)
 # ========================================
 
-set -e
 BUILD_START=$(date +"%s")
 
 # ========================================
@@ -15,6 +14,7 @@ SRC="$(pwd)"
 OUT_DIR="$SRC/out"
 KERNEL_IMG="$OUT_DIR/arch/arm64/boot/Image.gz"
 RESULT_DIR="$SRC/result"
+BUILD_LOG="$OUT_DIR/build.log"
 
 # Device info
 DEVICE="A226B"
@@ -145,6 +145,56 @@ clean_build() {
 }
 
 # ========================================
+# SEND ERROR LOG
+# ========================================
+send_error_log() {
+    error "Build failed! Sending error logs to Telegram..."
+    
+    if [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ]; then
+        warning "Telegram credentials not set, cannot send error log"
+        return 0
+    fi
+    
+    if [ ! -f "$BUILD_LOG" ]; then
+        warning "Build log not found at $BUILD_LOG"
+        return 0
+    fi
+    
+    # Extract last 30 errors
+    local ERROR_MSG=$(grep -iE "error:|failed:|undefined" "$BUILD_LOG" 2>/dev/null | tail -n 30 || echo "No specific errors found")
+    
+    # Escape special characters for HTML
+    ERROR_MSG=$(echo "$ERROR_MSG" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')
+    
+    local MSG="<b>❌ Build Failed!</b>
+
+<b>Device:</b> <code>$DEVICE</code>
+<b>Date:</b> <code>$DATE</code>
+<b>Config:</b> <code>$DEFCONFIG</code>
+
+<b>Last errors:</b>
+<pre>$ERROR_MSG</pre>
+
+Check the full build log for details."
+    
+    info "Uploading build log to Telegram..."
+    
+    # Send log file
+    local RESPONSE=$(curl -sS -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendDocument" \
+        -F "chat_id=$CHAT_ID" \
+        -F "document=@$BUILD_LOG" \
+        -F "caption=$MSG" \
+        -F "parse_mode=HTML" 2>&1)
+    
+    if echo "$RESPONSE" | grep -q '"ok":true'; then
+        success "Error log sent to Telegram!"
+    else
+        error "Failed to send error log to Telegram"
+        echo "Response: $RESPONSE"
+    fi
+}
+
+# ========================================
 # BUILD KERNEL
 # ========================================
 build_kernel() {
@@ -153,12 +203,15 @@ build_kernel() {
     info "Threads: $(nproc)"
     
     # Generate config
-    make O="$OUT_DIR" ARCH="$ARCH" "$DEFCONFIG" -j$(nproc) || {
+    if ! make O="$OUT_DIR" ARCH="$ARCH" "$DEFCONFIG" -j$(nproc); then
         error "Failed to generate defconfig!"
+        send_error_log
         exit 1
-    }
+    fi
     
-    # Build
+    # Build kernel
+    info "Compiling kernel..."
+    set +e  # Disable exit on error temporarily
     make -j$(nproc) \
         O="$OUT_DIR" \
         ARCH="$ARCH" \
@@ -166,9 +219,12 @@ build_kernel() {
         CLANG_TRIPLE="$CLANG_TRIPLE" \
         CROSS_COMPILE="$CROSS_COMPILE" \
         CROSS_COMPILE_COMPAT="$CROSS_COMPILE_COMPAT" \
-        2>&1 | tee "$OUT_DIR/build.log"
+        2>&1 | tee "$BUILD_LOG"
     
-    if [ $? -ne 0 ]; then
+    local BUILD_STATUS=${PIPESTATUS[0]}
+    set -e  # Re-enable exit on error
+    
+    if [ $BUILD_STATUS -ne 0 ]; then
         error "Kernel compilation failed!"
         send_error_log
         exit 1
@@ -184,8 +240,9 @@ verify_build() {
     info "Verifying kernel image..."
     
     if [ ! -f "$KERNEL_IMG" ]; then
-        error "Image.gz not found!"
+        error "Image.gz not found at $KERNEL_IMG"
         ls -lah "$OUT_DIR/arch/arm64/boot/" 2>/dev/null || true
+        send_error_log
         exit 1
     fi
     
@@ -202,10 +259,11 @@ get_kernel_info() {
     local IMG="$OUT_DIR/arch/arm64/boot/Image"
     
     if [ -f "$IMG" ]; then
-        KERNEL_VERSION=$(strings "$IMG" | grep "Linux version")
+        KERNEL_VERSION=$(strings "$IMG" | grep "Linux version" || echo "Unknown")
         echo "Version: $KERNEL_VERSION"
     else
         KERNEL_VERSION="Unknown"
+        warning "Kernel Image not found, version unknown"
     fi
 }
 
@@ -219,7 +277,8 @@ package_kernel() {
     
     # Clone AnyKernel3
     if [ ! -d "$AK_DIR" ]; then
-        git clone --depth=1 https://github.com/makruf1954/AnyKernel3.git -b a22x "$AK_DIR" -q
+        info "Cloning AnyKernel3..."
+        git clone --depth=1 https://github.com/naifiprjkt/AnyKernel3.git -b a22x "$AK_DIR" -q
     fi
     
     # Copy Image.gz
@@ -242,7 +301,7 @@ package_kernel() {
 upload_to_gofile() {
     info "Uploading to GoFile..."
     
-    cd "$RESULT_DIR" || exit 1
+    cd "$RESULT_DIR" || return 1
     
     # Try multiple servers
     for server in store1 store2 store3 store4; do
@@ -269,37 +328,6 @@ upload_to_gofile() {
 }
 
 # ========================================
-# SEND ERROR LOG
-# ========================================
-send_error_log() {
-    error "Sending error logs to Telegram..."
-    
-    if [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ]; then
-        warning "Telegram credentials not set, skipping..."
-        return 0
-    fi
-    
-    local LOG_FILE="$OUT_DIR/build.log"
-    local ERROR_MSG=$(grep -i "error" "$LOG_FILE" 2>/dev/null | tail -n 20 || echo "No errors found in log")
-    
-    local MSG="<b>Build Failed!</b>
-
-<b>Device:</b> <code>$DEVICE</code>
-<b>Date:</b> <code>$DATE</code>
-
-<b>Last 20 errors:</b>
-<pre>$ERROR_MSG</pre>"
-    
-    if [ -f "$LOG_FILE" ]; then
-        curl -sS -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendDocument" \
-            -F "chat_id=$CHAT_ID" \
-            -F "document=@$LOG_FILE" \
-            -F "caption=$MSG" \
-            -F "parse_mode=HTML" &>/dev/null || true
-    fi
-}
-
-# ========================================
 # SEND TELEGRAM NOTIFICATION
 # ========================================
 send_telegram_notification() {
@@ -311,7 +339,7 @@ send_telegram_notification() {
     fi
     
     if [ -z "$DOWNLOAD_LINK" ]; then
-        warning "No download link available"
+        warning "No download link available, skipping notification"
         return 0
     fi
     
