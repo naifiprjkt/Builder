@@ -188,12 +188,19 @@ verify_build() {
 # ========================================
 get_kernel_info() {
     info "Extracting kernel version..."
-    
+
     if [ -f "$KERNEL_IMG" ]; then
-        KERNEL_VERSION=$(strings "$KERNEL_IMG" | grep -m1 "Linux version")
+        KERNEL_VERSION=$(strings "$KERNEL_IMG" 2>/dev/null | grep -m1 "Linux version" || true)
+
+        if [ -z "$KERNEL_VERSION" ]; then
+            warning "Kernel version string not found in Image.gz, marking as Unknown"
+            KERNEL_VERSION="Unknown"
+        fi
+
         echo "Version: $KERNEL_VERSION"
     else
         KERNEL_VERSION="Unknown"
+        warning "Kernel image missing, cannot extract version"
     fi
 }
 
