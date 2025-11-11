@@ -18,7 +18,7 @@ RESULT_DIR="$SRC/result"
 
 # Device info
 DEVICE="A226B"
-DEFCONFIG="a22x_defconfig"
+DEFCONFIG="azure_defconfig"
 ARCH="arm64"
 DATE="$(date +"%Y%m%d%H%M")"
 KERNEL_ZIP="${DEVICE}-KSU-${DATE}.zip"
