@@ -136,35 +136,37 @@ clean_build() {
 }
 
 # ========================================
-# BUILD KERNEL
+# BUILD KERNEL (with better fail handling)
 # ========================================
 build_kernel() {
     info "Building kernel for $DEVICE..."
     info "Config: $DEFCONFIG"
     info "Threads: $(nproc)"
-    
-    # Generate config
-    make O="$OUT_DIR" ARCH="$ARCH" "$DEFCONFIG" -j$(nproc) || {
+
+    # pastikan log file ada dari awal
+    : > "$OUT_DIR/build.log"
+
+    # Generate defconfig
+    if ! make O="$OUT_DIR" ARCH="$ARCH" "$DEFCONFIG" -j$(nproc) 2>&1 | tee -a "$OUT_DIR/build.log"; then
         error "Failed to generate defconfig!"
+        send_error_log
         exit 1
-    }
-    
+    fi
+
     # Build
-    make -j$(nproc) \
+    if ! make -j$(nproc) \
         O="$OUT_DIR" \
         ARCH="$ARCH" \
         CC="$CC" \
         CLANG_TRIPLE="$CLANG_TRIPLE" \
         CROSS_COMPILE="$CROSS_COMPILE" \
         CROSS_COMPILE_COMPAT="$CROSS_COMPILE_COMPAT" \
-        2>&1 | tee "$OUT_DIR/build.log"
-    
-    if [ $? -ne 0 ]; then
+        2>&1 | tee -a "$OUT_DIR/build.log"; then
         error "Kernel compilation failed!"
         send_error_log
         exit 1
     fi
-    
+
     success "Kernel compiled successfully!"
 }
 
@@ -265,34 +267,46 @@ upload_to_gofile() {
 }
 
 # ========================================
-# SEND ERROR LOG
+# SEND ERROR LOG (improved & reliable)
 # ========================================
 send_error_log() {
     error "Sending error logs to Telegram..."
-    
+
     if [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ]; then
         warning "Telegram credentials not set, skipping..."
         return 0
     fi
-    
+
     local LOG_FILE="$OUT_DIR/build.log"
-    local ERROR_MSG=$(grep -i "error" "$LOG_FILE" 2>/dev/null | tail -n 20 || echo "No errors found in log")
-    
+
+    # fallback kalau log gak ada
+    if [ ! -f "$LOG_FILE" ]; then
+        echo "[WARN] build.log not found, creating minimal log..."
+        echo "No build.log generated, possibly error before compilation." > "$OUT_DIR/build.log"
+    fi
+
+    # buat ringkasan error di caption
+    local ERROR_MSG
+    ERROR_MSG=$(grep -i "error" "$LOG_FILE" 2>/dev/null | tail -n 20 || echo "No errors found in log")
+
     local MSG="<b>Build Failed!</b>
 
 <b>Device:</b> <code>$DEVICE</code>
 <b>Date:</b> <code>$DATE</code>
 
 <b>Last 20 errors:</b>
-<pre>$ERROR_MSG</pre>"
-    
-    if [ -f "$LOG_FILE" ]; then
-        curl -sS -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendDocument" \
-            -F "chat_id=$CHAT_ID" \
-            -F "document=@$LOG_FILE" \
-            -F "caption=$MSG" \
-            -F "parse_mode=HTML" &>/dev/null || true
-    fi
+<pre>${ERROR_MSG}</pre>"
+
+    # pastikan dikirim walau error kecil
+    curl -sS -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendDocument" \
+        -F "chat_id=${CHAT_ID}" \
+        -F "document=@${LOG_FILE}" \
+        -F "caption=${MSG}" \
+        -F "parse_mode=HTML" >/dev/null 2>&1 || {
+            warning "Failed to send log to Telegram"
+        }
+
+    success "Error log sent to Telegram!"
 }
 
 # ========================================
