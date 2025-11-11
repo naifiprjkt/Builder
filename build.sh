@@ -13,6 +13,7 @@ BUILD_START=$(date +"%s")
 # ========================================
 SRC="$(pwd)"
 OUT_DIR="$SRC/out"
+KERNEL_IMG1="$OUT_DIR/arch/arm64/boot/Image"
 KERNEL_IMG="$OUT_DIR/arch/arm64/boot/Image.gz"
 RESULT_DIR="$SRC/result"
 
@@ -189,11 +190,11 @@ verify_build() {
 get_kernel_info() {
     info "Extracting kernel version..."
 
-    if [ -f "$KERNEL_IMG" ]; then
-        KERNEL_VERSION=$(strings "$KERNEL_IMG" 2>/dev/null | grep -m1 "Linux version" || true)
+    if [ -f "$KERNEL_IMG1" ]; then
+        KERNEL_VERSION=$(strings "$KERNEL_IMG1" | grep "Linux version" || true)
 
         if [ -z "$KERNEL_VERSION" ]; then
-            warning "Kernel version string not found in Image.gz, marking as Unknown"
+            warning "Kernel version string not found in Image, marking as Unknown"
             KERNEL_VERSION="Unknown"
         fi
 
