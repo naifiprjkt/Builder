@@ -1,0 +1,50 @@
+name: Build Kernel
+
+on:
+  workflow_dispatch:
+    inputs:
+      BRANCH:
+        description: 'Kernel Branch'
+        required: true
+        default: 'kernelsu'
+        type: string
+
+jobs:
+  build:
+    name: Build ${{ github.event.inputs.BRANCH }}
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Setup Timezone
+        run: |
+          sudo ln -sf /usr/share/zoneinfo/Asia/Jakarta /etc/localtime
+          echo "BUILD_DATE=$(date +'%Y%m%d-%H%M')" >> $GITHUB_ENV
+          echo "BUILD_TIME=$(date +'%Y-%m-%d %H:%M:%S')" >> $GITHUB_ENV
+
+      - name: Checkout Kernel Source
+        uses: actions/checkout@v4
+        with:
+          repository: naifiprjkt/kernel_samsung_6833_common
+          ref: ${{ github.event.inputs.BRANCH }}
+          path: kernel
+          fetch-depth: 1
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            bc bison flex libssl-dev make clang gcc git \
+            libc6-dev curl wget zip python3 lz4 libelf-dev
+
+      - name: Download Build Script
+        working-directory: kernel
+        run: |
+          curl -LSso build.sh https://raw.githubusercontent.com/naifiprjkt/Builder/a22x/build.sh
+          chmod +x build.sh
+
+      - name: Build Kernel
+        working-directory: kernel
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+        run: ./build.sh
