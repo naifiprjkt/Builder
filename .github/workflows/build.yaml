@@ -3,7 +3,7 @@ name: Build Kernel
 on:
   workflow_dispatch:
     inputs:
-      BRANCH:
+      branch:
         description: 'Kernel Branch'
         required: true
         default: 'kernelsu'
@@ -11,7 +11,7 @@ on:
 
 jobs:
   build:
-    name: Build ${{ github.event.inputs.BRANCH }}
+    name: Build ${{ github.event.inputs.branch }}
     runs-on: ubuntu-latest
     
     steps:
@@ -26,6 +26,7 @@ jobs:
         with:
           repository: naifiprjkt/kernel_samsung_6833_common
           ref: ${{ github.event.inputs.BRANCH }}
+          token: ${{ secrets.GH_PAT }}
           path: kernel
           fetch-depth: 1
 
@@ -47,4 +48,116 @@ jobs:
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
-        run: ./build.sh
+        run: ./build.sh 2>&1 | tee build.log
+
+      - name: Extract Build Info
+        if: success()
+        working-directory: kernel
+        run: |
+          # Get kernel filename
+          KERNEL_FILE=$(ls result/*.zip 2>/dev/null | head -n1 | xargs basename || echo "")
+          echo "KERNEL_FILE=$KERNEL_FILE" >> $GITHUB_ENV
+          
+          # Get download link
+          DOWNLOAD_URL=$(grep -oP 'DOWNLOAD_LINK=\K.*' build.log | head -n1 || echo "")
+          echo "DOWNLOAD_URL=$DOWNLOAD_URL" >> $GITHUB_ENV
+          
+          # Get kernel version
+          KERNEL_VER=$(grep -oP 'Version: \K.*' build.log | head -n1 || echo "Unknown")
+          echo "KERNEL_VER=$KERNEL_VER" >> $GITHUB_ENV
+          
+          echo "📦 Kernel: $KERNEL_FILE"
+          echo "🔗 Link: $DOWNLOAD_URL"
+
+      - name: Build Success Summary
+        if: success()
+        run: |
+          echo "# 🎉 Kernel Build Successful!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📦 Build Details" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Info | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Device** | \`A226B (Galaxy A22 5G)\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Branch** | \`${{ github.event.inputs.branch }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Kernel File** | \`${{ env.KERNEL_FILE }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Build Time** | \`${{ env.BUILD_TIME }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Workflow Run** | \`#${{ github.run_number }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -n "${{ env.DOWNLOAD_URL }}" ]; then
+            echo "## 📥 Download Kernel" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### ✅ Upload to GoFile Successful!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Click the button below to download:**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "[![Download Kernel](https://img.shields.io/badge/Download-${{ env.KERNEL_FILE }}-brightgreen?style=for-the-badge&logo=android&logoColor=white)](${{ env.DOWNLOAD_URL }})" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Or copy the direct link:**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "${{ env.DOWNLOAD_URL }}" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "> **⚠️ Important:** Always backup your current boot image before flashing!" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ⚠️ Upload Failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "The kernel was built successfully but upload to GoFile failed." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Possible reasons:**" >> $GITHUB_STEP_SUMMARY
+            echo "- GoFile servers temporarily unavailable" >> $GITHUB_STEP_SUMMARY
+            echo "- Network connection timeout" >> $GITHUB_STEP_SUMMARY
+            echo "- File size exceeds service limits" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Solution:** Check build logs or try running the workflow again." >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📱 Kernel Information" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "${{ env.KERNEL_VER }}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "<div align=\"center\">" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Built with ❤️ using GitHub Actions**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "</div>" >> $GITHUB_STEP_SUMMARY
+
+      - name: Build Failed Summary
+        if: failure()
+        run: |
+          echo "# ❌ Build Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The kernel build process encountered an error and could not complete." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🔍 Common Issues" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Problem | Solution |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Compilation Error** | Check kernel source for syntax errors |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Missing Headers** | Verify all dependencies are installed |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Toolchain Error** | Ensure toolchains downloaded correctly |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Out of Memory** | GitHub runner resources may be exceeded |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Network Error** | Connection issues during setup phase |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📝 Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "1. 📋 Review the error logs in the **Build Kernel** step above" >> $GITHUB_STEP_SUMMARY
+          echo "2. 🔍 Look for lines marked with \`[ERROR]\`" >> $GITHUB_STEP_SUMMARY
+          echo "3. 📖 Check the compilation log for specific error messages" >> $GITHUB_STEP_SUMMARY
+          echo "4. 🔧 Fix the identified issues" >> $GITHUB_STEP_SUMMARY
+          echo "5. 🔄 Retry the build workflow" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Need help?** Check the full logs above for detailed error messages." >> $GITHUB_STEP_SUMMARY
