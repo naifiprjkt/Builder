@@ -132,32 +132,3 @@ jobs:
           echo "**Built with ❤️ using GitHub Actions**" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "</div>" >> $GITHUB_STEP_SUMMARY
-
-      - name: Build Failed Summary
-        if: failure()
-        run: |
-          echo "# ❌ Build Failed" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "The kernel build process encountered an error and could not complete." >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## 🔍 Common Issues" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Problem | Solution |" >> $GITHUB_STEP_SUMMARY
-          echo "|---------|----------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **Compilation Error** | Check kernel source for syntax errors |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Missing Headers** | Verify all dependencies are installed |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Toolchain Error** | Ensure toolchains downloaded correctly |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Out of Memory** | GitHub runner resources may be exceeded |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Network Error** | Connection issues during setup phase |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## 📝 Next Steps" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "1. 📋 Review the error logs in the **Build Kernel** step above" >> $GITHUB_STEP_SUMMARY
-          echo "2. 🔍 Look for lines marked with \`[ERROR]\`" >> $GITHUB_STEP_SUMMARY
-          echo "3. 📖 Check the compilation log for specific error messages" >> $GITHUB_STEP_SUMMARY
-          echo "4. 🔧 Fix the identified issues" >> $GITHUB_STEP_SUMMARY
-          echo "5. 🔄 Retry the build workflow" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "---" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Need help?** Check the full logs above for detailed error messages." >> $GITHUB_STEP_SUMMARY
