@@ -6,7 +6,7 @@ on:
       BRANCH:
         description: 'Kernel Branch'
         required: true
-        default: 'kernelsu'
+        default: 'staging'
         type: string
 
 jobs:
