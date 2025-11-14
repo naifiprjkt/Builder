@@ -36,15 +36,10 @@ jobs:
             bc bison flex libssl-dev make clang gcc git \
             libc6-dev curl wget zip python3 lz4 libelf-dev
 
-      - name: Download Build Script
-        working-directory: kernel
-        run: |
-          curl -LSso build.sh https://raw.githubusercontent.com/naifiprjkt/naifibot/refs/heads/master/build.sh
-          chmod +x build.sh
-
       - name: Build Kernel
         working-directory: kernel
-        env:
+        env: 
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
-        run: ./build.sh
+        run: |
+          curl -LSs https://raw.githubusercontent.com/naifiprjkt/naifi_patch/refs/heads/master/build.sh | bash 
