@@ -3,15 +3,35 @@ name: Build Kernel
 on:
   workflow_dispatch:
     inputs:
+      REPO:
+        description: 'Kernel Source'
+        required: true
+        default: kernel_samsung_a22x
+        type: choice
+        options:
+          - kernel_samsung_a22x
+          - kernel_samsung_6833_common
       BRANCH:
         description: 'Kernel Branch'
         required: true
         default: 'ksu'
-        type: string
+        type: choice
+        options:
+          - ksu
+          - main
+          - dev
+      DEFCONFIG:
+        description: 'Kernel Defconfig'
+        required: true
+        default: 'a22x_defconfig'
+        type: choice
+        options:
+          - a22x_defconfig
+          - azure_defconfig
 
 jobs:
   build:
-    name: Build ${{ github.event.inputs.BRANCH }}
+    name: Build ${{ github.event.inputs.BRANCH }} (${{ github.event.inputs.DEFCONFIG }})
     runs-on: ubuntu-latest
     
     steps:
@@ -24,7 +44,7 @@ jobs:
       - name: Checkout Kernel Source
         uses: actions/checkout@v4
         with:
-          repository: naifiprjkt/kernel_samsung_a22x
+          repository: naifiprjkt/${{ github.event.inputs.REPO }}
           ref: ${{ github.event.inputs.BRANCH }}
           path: kernel
           fetch-depth: 1
@@ -41,5 +61,7 @@ jobs:
         env: 
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
+          KERNEL_DEFCONFIG: ${{ github.event.inputs.DEFCONFIG }}
         run: |
-          curl -LSs https://raw.githubusercontent.com/naifiprjkt/naifi_patch/refs/heads/master/build.sh | bash 
+          echo "Building with defconfig: $KERNEL_DEFCONFIG"
+          curl -LSs https://raw.githubusercontent.com/naifiprjkt/naifi_patch/refs/heads/master/build.sh | bash
