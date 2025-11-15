@@ -6,7 +6,7 @@ on:
       BRANCH:
         description: 'Kernel Branch'
         required: true
-        default: 'staging'
+        default: 'ksu'
         type: string
 
 jobs:
@@ -24,7 +24,7 @@ jobs:
       - name: Checkout Kernel Source
         uses: actions/checkout@v4
         with:
-          repository: naifiprjkt/kernel_samsung_6833_common
+          repository: naifiprjkt/kernel_samsung_a22x
           ref: ${{ github.event.inputs.BRANCH }}
           path: kernel
           fetch-depth: 1
