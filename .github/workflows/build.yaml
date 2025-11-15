@@ -11,6 +11,7 @@ on:
         options:
           - kernel_samsung_a22x
           - kernel_samsung_6833_common
+     
       BRANCH:
         description: 'Kernel Branch'
         required: true
@@ -19,7 +20,9 @@ on:
         options:
           - ksu
           - main
-          - dev
+          - kernelsu
+          - staging
+          
       DEFCONFIG:
         description: 'Kernel Defconfig'
         required: true
